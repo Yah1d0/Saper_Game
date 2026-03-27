@@ -21,7 +21,7 @@
 
 **Langauge:** C++ 17/20
 
-**Library:** NSFMl 3.x.x
+**Library:** SFML 3.x.x
 
 
 ## Usage/Examples
