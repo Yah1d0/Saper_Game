@@ -1,0 +1,45 @@
+## (VisualStudio/VisualStudio Code).gitignore (C++ focus)
+# User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+
+# Visual Studio 2015/2017 cache/options directory
+ConsoleVersion/x64/
+SFMLVersion/x64/
+**/x64/
+
+# Visual Studio cache
+.vs/
+.vscode/
+
+# Visual Studio temporary files
+*.tlog
+*.ilk
+*.pdb
+*.idb
+*.ipdb
+*.lib
+*.exp
+*.manifest
+ipch/
+
+# Logs
+*.log
+
+# Windows
+Thumbs.db
+Desktop.ini
