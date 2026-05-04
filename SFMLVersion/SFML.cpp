@@ -199,7 +199,7 @@ private:
 
 			if (button == sf::Mouse::Button::Left) {
 				bool hitMine = board.openCell(pressedRow, pressedCol);
-				if (!hitMine && board.canBeChorded(pressedRow, pressedCol)) {
+				if (!hitMine) {
 					board.Chord(pressedRow, pressedCol);
 				}
 				checkWinOrLoss();

@@ -215,10 +215,8 @@ int main() {
             board.Flag(r, c);
         }
         else {
-            if (board.canBeChorded(r, c)) {
-                if (!board.openCell(r, c)) {
-                    board.Chord(r, c);
-                }
+            if (!board.openCell(r, c)) {
+                board.Chord(r, c);
             }
             else {
                 board.openCell(r, c);

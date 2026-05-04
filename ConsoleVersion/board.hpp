@@ -24,6 +24,7 @@ class Board {
             {0, -1},           {0, 1}, 
             {1, -1},  {1, 0},  {1, 1}
         }};
+        bool canBeChorded(int row, int col) const;
 
     public:
         Board(int rows, int cols, int mines);
@@ -37,7 +38,6 @@ class Board {
         bool isValidMove(int row, int col) const;
         bool openCell(int row, int col);
         bool Flag(int row, int col);
-        bool canBeChorded(int row, int col) const;
         void Chord(int row, int col);
         void revealAll();
         bool isRevealed(int row, int col) const;

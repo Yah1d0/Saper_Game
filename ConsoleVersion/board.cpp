@@ -147,6 +147,7 @@ bool Board::canBeChorded(int row, int col) const {
 }
 
 void Board::Chord(int row, int col) {
+    if (!this->canBeChorded(row, col)) return;
     for (const auto &dir : directions){
         int r = row + dir.first;
         int c = col + dir.second;

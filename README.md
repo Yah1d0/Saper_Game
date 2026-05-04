@@ -1,12 +1,9 @@
 
+# Saper Game (SFML)
+
 ![C++](https://img.shields.io/badge/C++-17%2F20-blue.svg)
 ![SFML](https://img.shields.io/badge/Library-SFML%203.x-green.svg)
 ![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey.svg)
-
-# Saper Game (SFML)
-
-
-
 
 ## Features
 
@@ -16,22 +13,17 @@
 - Chording mechanic
 - PC adaptive layout
 
-
 ## Tech Stack
 
 **Langauge:** C++ 17/20
 
 **Library:** SFML 3.x.x
 
-
 ## Usage/Examples
 
 **LMB:** Open cell/Chording(on opened cell)
 
 **RMB:** Flag cell
-
-
-
 
 ## Structure
 
@@ -54,6 +46,7 @@ The project is divided into two main versions sharing the same core logic:
 ├── Saper_game.slnx          # Visual Studio Solution (modern format)
 └── .gitignore               # Keeps your repo clean
 ```
+
 ## Run Locally
 
 Clone the project
@@ -84,6 +77,7 @@ Install dependencies
 ### Manual Compilation (g++)
 
 **Console Build:**
+
 ```Bash
 g++ ConsoleVersion/console.cpp ConsoleVersion/board.cpp -o SaperConsole
 ```
@@ -94,5 +88,4 @@ g++ ConsoleVersion/console.cpp ConsoleVersion/board.cpp -o SaperConsole
 g++ SFMLVersion/SFML.cpp ConsoleVersion/board.cpp -IConsoleVersion -o SaperGUI
 ```
 
-*(Note: Ensure SFML 3.x headers and libraries are in your compiler's search path.)*
-
+> **Note:** Ensure SFML 3.x headers and libraries are in your compiler's search path.
