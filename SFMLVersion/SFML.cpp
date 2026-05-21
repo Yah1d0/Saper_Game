@@ -6,6 +6,7 @@
 #include <sstream>
 #include <algorithm>
 #include <iomanip>
+#include "sfml.hpp"
 
 const int tileSize = 32;
 const int baseTopBarHeight = 60;
@@ -30,7 +31,7 @@ struct CellAnim {
 	bool removeFlag = false;
 };
 
-sf::IntRect getTextureRect(SpriteType type, bool isDark) {
+sf::FloatRect getTextureRect(SpriteType type, bool isDark) {
 	int x = 0;
 	int y = 0;
 	switch (type) {
@@ -60,7 +61,7 @@ sf::IntRect getTextureRect(SpriteType type, bool isDark) {
 	if (isDark && (type == Mine || type == Empty || (type >= One && type <= Eight))) {
 		x += 3;
 	}
-	return sf::IntRect({ x * tileSize, y * tileSize }, { tileSize, tileSize });
+	return sf::FloatRect({ x * tileSize, y * tileSize }, { tileSize, tileSize });
 }
 
 SpriteType getOpenFrame(float progress) {
@@ -85,37 +86,85 @@ void Lerp(float& progress, float dt, float speed) {
 	}
 }
 
-class Game {
+class UI {
 private:
-	Board board;
-	int rows, cols;
-	int totalMines;
-
-	bool gameStarted = false;
-	bool gameEnded = false;
-	float finalTime = 0.0f;
-
-	std::vector<std::vector<CellAnim>> cellAnimState;
-	std::vector<std::vector<bool>> wasRevealed;
-	std::vector<std::vector<bool>> wasFlagged;
-
+	float cellScalePx;
+	std::pair<float, float> gridStartPos;
+	float boardWidth;
+	float topBarHeight;
+	sf::VertexArray cellsVA;
 	sf::RenderWindow& window;
 	sf::Clock dtClock;
 	sf::Clock gameTimer;
-
 	sf::Texture tilesTexture;
 	sf::Font font;
-
-	sf::Sprite& sprite;
 	sf::Text& textTimer;
 	sf::Text& textMines;
-
 	sf::RectangleShape topBarRect;
+public:
+	UI(Game& game) {
 
-	float scale;
-	float gridStartX, gridStartY;
-	float finalBoardWidth;
-	float finalTopBarHeight;
+	}
+
+	void initLayout(Board& board) {
+		int rows = board.getRows();
+		int cols = board.getCols();
+		cellsVA.setPrimitiveType(sf::PrimitiveType::Triangles);
+		cellsVA.resize(rows * cols * 6);
+		for (int r = 0; r < rows; ++r) {
+			for (int c = 0; c < cols; ++c) {
+				sf::Vertex* cellVertex = &cellsVA[(r * cols + c) * 6];
+				float left = c * tileSize;
+				float right = (c + 1) * tileSize;
+				float top = r * tileSize;
+				float bottom = (r + 1) * tileSize;
+				cellVertex[0].position = { left, top };
+				cellVertex[1].position = { right, top };
+				cellVertex[2].position = { left, bottom };
+				cellVertex[3].position = { right, top };
+				cellVertex[4].position = { right, bottom };
+				cellVertex[5].position = { left, bottom };
+
+				bool isDark = (r + c) & 1;
+				sf::FloatRect textureRect = getTextureRect(SpriteType::Closed, isDark);
+				float txRectLeft = textureRect.position.x;
+				float txRectRight = txRectLeft + textureRect.size.x;
+				float txRectTop = textureRect.position.y;
+				float txRectBottom = txRectTop + textureRect.size.y;
+				cellVertex[0].texCoords = { txRectLeft, txRectTop };
+				cellVertex[1].texCoords = { txRectRight, txRectTop };
+				cellVertex[2].texCoords = { txRectLeft, txRectBottom };
+				cellVertex[3].texCoords = { txRectRight, txRectTop };
+				cellVertex[4].texCoords = { txRectRight, txRectBottom };
+				cellVertex[5].texCoords = { txRectLeft, txRectBottom };
+			}
+		}
+	}
+
+	void updateCell(int row, int col, const Cell& cell, const CellAnim& anim, std::pair<int, int> explodedMine) {
+		int idx = (row * cols + col) * 6;
+
+	}
+
+	void loadResources();
+	void handleInput(float mouseX, float mouseY, sf::Mouse::Button button);
+	void processEvents();
+	void update();
+	void render();
+	void drawCell();
+	void run();
+};
+
+class Game {
+private:
+	Board board;
+	GameState state;
+	int rows, cols;
+	int totalMines;
+
+	float finishTimeMs = 0.0;
+	std::unique_ptr<CellAnim[]> AnimStateArr;
+	std::unique_ptr<CellState[]> CellStateArr;
 
 	void initializeLayout() {
 		sf::Vector2u winSize = window.getSize();
@@ -352,6 +401,14 @@ public:
 		initializeLayout();
 	}
 
+	Game(int rows, int cols)
+		: totalMines(static_cast<int>(rows* cols * 0.156)),
+		board(rows, cols, totalMines) {
+		this->AnimStateArr = std::make_unique<CellAnim[]>(rows * cols);
+		this->CellStateArr = std::make_unique<CellState[]>(rows * cols);
+		this->state = Menu();
+	}
+
 	void run() {
 		while (window.isOpen()) {
 			float dt = dtClock.restart().asSeconds();
@@ -359,6 +416,10 @@ public:
 			update(dt);
 			render();
 		}
+	}
+
+	Board& getBoard() {
+		return this->board;
 	}
 };
 
@@ -378,7 +439,9 @@ int main() {
 	sf::Text textTimer(tempFont);
 	sf::Text textMines(tempFont);
 
-	Game game(rows, cols, minesPercent, window, sprite, textTimer, textMines);
+	Game game(rows, cols);
+	UI ui(game);
+	ui.run();
 	game.run();
 	return 0;
 }

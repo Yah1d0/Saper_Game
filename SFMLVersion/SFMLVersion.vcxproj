@@ -146,6 +146,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\ConsoleVersion\board.hpp" />
+    <ClInclude Include="SFML.hpp" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="tiles.png" />

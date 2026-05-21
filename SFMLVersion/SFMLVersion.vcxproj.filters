@@ -34,6 +34,9 @@
     <ClInclude Include="..\ConsoleVersion\board.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="SFML.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Image Include="tiles.png">
