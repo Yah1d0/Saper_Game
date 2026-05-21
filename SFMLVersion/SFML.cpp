@@ -143,7 +143,43 @@ public:
 
 	void updateCell(int row, int col, const Cell& cell, const CellAnim& anim, std::pair<int, int> explodedMine) {
 		int idx = (row * cols + col) * 6;
+		bool isDark = (row + col) & 1;
+		sf::FloatRect textureRect = getTextureRect(getCellType(row, col, cell, anim, explodedMine), isDark);
+		float txRectLeft = textureRect.position.x;
+		float txRectRight = txRectLeft + textureRect.size.x;
+		float txRectTop = textureRect.position.y;
+		float txRectBottom = txRectTop + textureRect.size.y;
+		cellsVA[idx + 0].texCoords = { txRectLeft, txRectTop };
+		cellsVA[idx + 1].texCoords = { txRectRight, txRectTop };
+		cellsVA[idx + 2].texCoords = { txRectLeft, txRectBottom };
+		cellsVA[idx + 3].texCoords = { txRectRight, txRectTop };
+		cellsVA[idx + 4].texCoords = { txRectRight, txRectBottom };
+		cellsVA[idx + 5].texCoords = { txRectLeft, txRectBottom };
+	}
 
+	SpriteType getCellType(int row, int col, const Cell& cell, const CellAnim& anim, std::pair<int, int> explodedMine) {
+		if (!cell.isRevealed) {
+			if (anim.flagProgress > 0.0f && anim.flagProgress < 1.0f) {
+				float progress = anim.flagProgress;
+				if (anim.flagProgress && progress > 0.0f) progress = 1.0f - progress;
+				return getFlagFrame(progress);
+			}
+			if (cell.isFlagged) {
+				return Flagged;
+			}
+			return Closed;
+		}
+		else {
+			if (anim.openProgress > 0.0f && anim.openProgress < 1.0f) {
+				return getOpenFrame(anim.openProgress);
+			}
+			if (cell.isMine) {
+				return (explodedMine == std::make_pair(row, col)) ? Exploded : Mine;
+			}
+			else {
+				return static_cast<SpriteType>(Empty + cell.neighborMines);
+			}
+		}
 	}
 
 	void loadResources();
