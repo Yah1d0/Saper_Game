@@ -86,6 +86,22 @@ void Lerp(float& progress, float dt, float speed) {
 	}
 }
 
+ClickHandler::ClickHandler(Game& g, int r, int c) : game(g), row(r), col(c) {}
+
+void ClickHandler::operator()(MouseButton& button) {
+	Board& board = game.getBoard();
+	if (button == MouseButton::LCM) {
+		bool hitMine = board.openCell(row, col);
+		if (!hitMine) {
+			board.Chord(row, col);
+		}
+	}
+	else if (button == MouseButton::RCM) {
+		board.Flag(row, col);
+	}
+	game.updateBoard();
+}
+
 class UI {
 private:
 	float cellScalePx;
@@ -103,7 +119,7 @@ private:
 	sf::RectangleShape topBarRect;
 public:
 	UI(Game& game) {
-
+		// TODO: Constructor of connection
 	}
 
 	void initLayout(Board& board) {
@@ -142,6 +158,7 @@ public:
 	}
 
 	void updateCell(int row, int col, const Cell& cell, const CellAnim& anim, std::pair<int, int> explodedMine) {
+		int cols = this->gam
 		int idx = (row * cols + col) * 6;
 		bool isDark = (row + col) & 1;
 		sf::FloatRect textureRect = getTextureRect(getCellType(row, col, cell, anim, explodedMine), isDark);
@@ -182,8 +199,28 @@ public:
 		}
 	}
 
-	void loadResources();
-	void handleInput(float mouseX, float mouseY, sf::Mouse::Button button);
+	bool loadResources() {
+		if (!tilesTexture.loadFromFile("tiles.png") || !font.openFromFile("font.ttf")) {
+			return false;
+		}
+		tilesTexture.setSmooth(false);
+		textTimer.setFont(font);
+		textMines.setFont(font);
+		textTimer.setFillColor(sf::Color::White);
+		textTimer.setStyle(sf::Text::Bold);
+		textMines.setFillColor(sf::Color::White);
+		textMines.setStyle(sf::Text::Bold);
+		return true;
+	}
+
+	void handleInput(float mouseX, float mouseY, sf::Mouse::Button button) {
+		float localX = mouseX - gridStartPos.first;
+		float localY = mouseY - gridStartPos.second;
+		int pressedCol = static_cast<int>(localX / cellScalePx);
+		int pressedRow = static_cast<int>(localY / cellScalePx);
+		if (board.isValidMove)
+	}
+
 	void processEvents();
 	void update();
 	void render();

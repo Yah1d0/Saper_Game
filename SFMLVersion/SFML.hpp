@@ -1,6 +1,8 @@
 #include "../ConsoleVersion/board.hpp"
 #include <variant>
 
+class Game;
+
 enum class MouseButton { LCM, RCM };
 
 struct CellAnim {
@@ -10,10 +12,10 @@ struct CellAnim {
 };
 
 struct ClickHandler {
-	Board& board;
+	Game& game;
 	int row;
 	int col;
-	ClickHandler(Board& b, int r, int c);
+	ClickHandler(Game& g, int r, int c);
 	void operator()(MouseButton& button);
 };
 
@@ -36,11 +38,16 @@ public:
 	void getGameResult();
 	void updateBoard();
 	void handleInput();
-	const CellAnim* getAnimState() const;
+	Board& getBoard() { return board; }
+	const Board& getBoard() const { return board; }
+	const CellAnim* getAnimState() const { return AnimStateArr.get(); }
+	const CellState* getCellState() const { return CellStateArr.get(); }
+	GameState getGameState() const { return state; }
 };
 
 class UI {
 private:
+	Game& game;
 	float cellScalePx;
 	std::pair<float, float> gridStartPos;
 	float boardWidth;
