@@ -33,6 +33,11 @@ const Cell &Board::getCell(int row, int col) const {
     return grid[getIndex(row, col)];
 }
 
+Cell& Board::getCell(int row, int col)
+{
+    return grid[getIndex(row, col)];
+}
+
 void Board::placeMines(int safeRow, int safeCol) {
     auto candidates = getCandidates(safeRow, safeCol);
     std::shuffle(candidates.begin(), candidates.end(), gen);

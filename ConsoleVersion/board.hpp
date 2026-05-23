@@ -31,6 +31,7 @@ class Board {
         std::vector<std::pair<int, int>> getCandidates(int safeRow, int safeCol) const;
         void placeMines(int safeRow, int safeCol);
         const Cell &getCell(int row, int col) const;
+        Cell& getCell(int row, int col);
         int  getRows() const;
         int  getCols() const;
         std::pair<int, int> getExplodedMine() const;

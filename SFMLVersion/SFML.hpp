@@ -1,5 +1,7 @@
+#pragma once
 #include "../ConsoleVersion/board.hpp"
 #include <variant>
+#include <SFML/Graphics.hpp>
 
 class Game;
 
@@ -40,9 +42,13 @@ public:
 	void handleInput();
 	Board& getBoard() { return board; }
 	const Board& getBoard() const { return board; }
+	CellAnim* getAnimState() { return AnimStateArr.get(); }
 	const CellAnim* getAnimState() const { return AnimStateArr.get(); }
+	CellState* getCellState() { return CellStateArr.get(); }
 	const CellState* getCellState() const { return CellStateArr.get(); }
 	GameState getGameState() const { return state; }
+	int getRows() const { return rows; }
+	int getCols() const { return cols; }
 };
 
 class UI {
@@ -53,23 +59,23 @@ private:
 	float boardWidth;
 	float topBarHeight;
 	sf::VertexArray cellsVA;
-	sf::RenderWindow& window;
+	sf::RenderWindow window;
 	sf::Clock dtClock;
 	sf::Clock gameTimer;
 	sf::Texture tilesTexture;
 	sf::Font font;
-	sf::Text& textTimer;
-	sf::Text& textMines;
+	sf::Text textTimer;
+	sf::Text textMines;
 	sf::RectangleShape topBarRect;
 public:
 	UI(Game& game);
 	void initLayout();
-	void updateCell();
-	void loadResources();
+	void updateCell(int row, int col, const Cell& cell, const CellAnim& anim, std::pair<int, int> explodedMine);
+	SpriteType getCellType(int row, int col, const CellAnim& anim, std::pair<int, int> explodedMine);
+	bool loadResources();
 	void handleInput(float mouseX, float mouseY, sf::Mouse::Button button);
 	void processEvents();
 	void update();
 	void render();
-	void drawCell();
 	void run();
 };
