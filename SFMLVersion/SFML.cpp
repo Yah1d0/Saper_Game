@@ -14,23 +14,6 @@ const int minMargin = 100;
 const float openSpeed = 4.0f;
 const float flagSpeed = 5.0f;
 
-enum SpriteType {
-	Closed,
-	Flagged,
-	WrongFlagged,
-	Mine,
-	Exploded,
-	Empty, One, Two, Three, Four, Five, Six, Seven, Eight,
-	OpenAnim_0, OpenAnim_1, OpenAnim_2, OpenAnim_3,
-	FlagAnim_0, FlagAnim_1, FlagAnim_2, FlagAnim_3
-};
-
-struct CellAnim {
-	float openProgress = 0.0f;
-	float flagProgress = 0.0f;
-	bool removeFlag = false;
-};
-
 sf::FloatRect getTextureRect(SpriteType type, bool isDark) {
 	int x = 0;
 	int y = 0;
@@ -102,8 +85,15 @@ void ClickHandler::operator()(MouseButton& button) {
 	game.updateBoard();
 }
 
-UI::UI(Game& game): game(game) {
-	// TODO: Constructor of connection
+UI::UI(Game& game):
+	game(game),
+	window(sf::VideoMode({ 800, 600 }), "Saper", sf::Style::Default),
+	textTimer(font),
+	textMines(font) 
+{
+	window.setFramerateLimit(60);
+	loadResources();
+	initLayout();
 }
 
 void UI::initLayout() {
@@ -230,7 +220,37 @@ void UI::update() {
 	int cols = board.getCols();
 	CellAnim* animState = game.getAnimState();
 	CellState* cellState = game.getCellState();
-	
+	for (int i = 0; i < rows; i++) {
+		for (int j = 0; j < cols; j++) {
+			int idx = i * cols + j;
+			const Cell& cell = board.getCell(i, j);
+			CellAnim& anim = animState[idx];
+			Lerp(anim.openProgress, dt, openSpeed);
+			Lerp(anim.flagProgress, dt, flagSpeed);
+			updateCell(i, j, cell, anim, board.getExplodedMine());
+		}
+	}
+	int flagsPlaced = 0;
+	for (int i = 0; i < rows; i++) {
+		for (int j = 0; j < cols; j++) {
+			if (board.getCell(i, j).isFlagged) flagsPlaced++;
+		}
+	}
+	int totalMines = rows * cols * 0.156f;
+	textMines.setString("Mines left: " + std::to_string(totalMines - flagsPlaced));
+	bool isGameWon = board.isGameWon();
+	bool isGameOver = board.isGameOver();
+	float currentTime = gameTimer.getElapsedTime().asSeconds();
+	if (isGameOver || isGameWon) {
+		currentTime = 0.0f;
+	}
+
+	std::stringstream ss;
+	ss << std::fixed << std::setprecision(1) << currentTime;
+	textTimer.setString(ss.str());
+	float textY = (topBarHeight - textMines.getGlobalBounds().size.y) / 2.0f - (5 * cellScalePx);
+	textMines.setPosition({ gridStartPos.first, textY });
+	textTimer.setPosition({ gridStartPos.first + boardWidth - textTimer.getGlobalBounds().size.x, textY });
 }
 
 void UI::render() {
@@ -250,151 +270,12 @@ void UI::run() {
 	}
 }
 
-void Game::handleInput(float mouseX, float mouseY, sf::Mouse::Button button) {
-	float localX = mouseX - gridStartX;
-	float localY = mouseY - gridStartY;
-
-	int pressedCol = static_cast<int>(localX / (tileSize * scale));
-	int pressedRow = static_cast<int>(localY / (tileSize * scale));
-
-	if (localX >= 0 && localY >= 0 && board.isValidMove(pressedRow, pressedCol) && !gameEnded) {
-		if (!gameStarted) {
-			gameStarted = true;
-			gameTimer.restart();
-		}
-
-		if (button == sf::Mouse::Button::Left) {
-			bool hitMine = board.openCell(pressedRow, pressedCol);
-			if (!hitMine) {
-				board.Chord(pressedRow, pressedCol);
-			}
-			checkWinOrLoss();
-		}
-		else if (button == sf::Mouse::Button::Right) {
-			board.Flag(pressedRow, pressedCol);
-		}
-	}
-}
-
-void Game::checkWinOrLoss() {
-	if (board.isGameOver() || board.isGameWon()) {
-		board.revealAll();
-		gameEnded = true;
-		finalTime = gameTimer.getElapsedTime().asSeconds();
-	}
-}
-
-void Game::update(float dt) {
-	for (int i = 0; i < rows; i++) {
-		for (int j = 0; j < cols; j++) {
-			const Cell& cell = board.getCell(i, j);
-			CellAnim& anim = cellAnimState[i][j];
-
-			if (cell.isRevealed && !wasRevealed[i][j]) {
-				anim.openProgress = 0.01f;
-			}
-			if (!cell.isRevealed && cell.isFlagged && !wasFlagged[i][j]) {
-				anim.flagProgress = 0.01f;
-				anim.removeFlag = false;
-			}
-			if (!cell.isRevealed && !cell.isFlagged && wasFlagged[i][j]) {
-				anim.flagProgress = 0.01f;
-				anim.removeFlag = true;
-			}
-
-			wasRevealed[i][j] = cell.isRevealed;
-			wasFlagged[i][j] = cell.isFlagged;
-
-			Lerp(anim.openProgress, dt, openSpeed);
-			Lerp(anim.flagProgress, dt, flagSpeed);
-		}
-	}
-
-	int flagsPlaced = 0;
-	for (int i = 0; i < rows; i++) {
-		for (int j = 0; j < cols; j++) {
-			if (board.getCell(i, j).isFlagged) flagsPlaced++;
-		}
-	}
-
-	textMines.setString("Mines left: " + std::to_string(totalMines - flagsPlaced));
-
-	float currentTime = gameEnded ? finalTime : (gameStarted ? gameTimer.getElapsedTime().asSeconds() : 0.0f);
-	std::stringstream ss;
-	ss << std::fixed << std::setprecision(1) << currentTime;
-	textTimer.setString(ss.str());
-
-	float textY = (finalTopBarHeight - textMines.getGlobalBounds().size.y) / 2.0f - (5 * scale);
-	textMines.setPosition({ gridStartX, textY });
-	textTimer.setPosition({ gridStartX + finalBoardWidth - textTimer.getGlobalBounds().size.x, textY });
-}
-
-void Game::drawCell(int i, int j) {
-	const Cell& cell = board.getCell(i, j);
-	const CellAnim& anim = cellAnimState[i][j];
-
-	float posX = gridStartX + (j * tileSize * scale);
-	float posY = gridStartY + (i * tileSize * scale);
-	sprite.setPosition({ posX, posY });
-
-	bool isDark = ((i + j) % 2) != 0;
-
-	SpriteType backType = Empty;
-	if (cell.isMine) {
-		if (cell.isRevealed && board.getExplodedMine() == std::make_pair(i, j))
-			backType = Exploded;
-		else
-			backType = Mine;
-	}
-	else {
-		switch (cell.neighborMines) {
-		case 1: backType = One; break;
-		case 2: backType = Two; break;
-		case 3: backType = Three; break;
-		case 4: backType = Four; break;
-		case 5: backType = Five; break;
-		case 6: backType = Six; break;
-		case 7: backType = Seven; break;
-		case 8: backType = Eight; break;
-		}
-	}
-	sprite.setTextureRect(getTextureRect(backType, isDark));
-	window.draw(sprite);
-
-	if (!cell.isRevealed) {
-		sprite.setTextureRect(getTextureRect(Closed, isDark));
-		window.draw(sprite);
-
-		if (cell.isFlagged || (anim.flagProgress > 0.0f && anim.flagProgress < 1.0f)) {
-			float p = anim.flagProgress;
-			if (anim.removeFlag && p > 0.0f) p = 1.0f - p;
-
-			SpriteType flagType = (p > 0.0f && p < 1.0f) ? getFlagFrame(p) : Flagged;
-			if (board.isGameOver() && !cell.isMine && cell.isFlagged) {
-				flagType = WrongFlagged;
-			}
-
-			float alpha = (p > 0.0f && p < 1.0f) ? p : 1.0f;
-			sprite.setTextureRect(getTextureRect(flagType, isDark));
-			sprite.setColor(sf::Color(255, 255, 255, (255 * alpha)));
-			window.draw(sprite);
-			sprite.setColor(sf::Color::White);
-		}
-	}
-	else if (anim.openProgress > 0.0f && anim.openProgress < 1.0f) {
-		SpriteType frame = getOpenFrame(anim.openProgress);
-		sprite.setTextureRect(getTextureRect(frame, isDark));
-		window.draw(sprite);
-	}
-}
-
-
 Game::Game(int rows, int cols)
 	: totalMines(static_cast<int>(rows* cols * 0.156)),
 	board(rows, cols, totalMines) {
 	this->AnimStateArr = std::make_unique<CellAnim[]>(rows * cols);
 	this->CellStateArr = std::make_unique<CellState[]>(rows * cols);
-	this->state = Menu();
+	this->state = GameState::Menu;
 }
 
 int main() {

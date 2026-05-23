@@ -21,6 +21,17 @@ struct ClickHandler {
 	void operator()(MouseButton& button);
 };
 
+enum SpriteType {
+	Closed,
+	Flagged,
+	WrongFlagged,
+	Mine,
+	Exploded,
+	Empty, One, Two, Three, Four, Five, Six, Seven, Eight,
+	OpenAnim_0, OpenAnim_1, OpenAnim_2, OpenAnim_3,
+	FlagAnim_0, FlagAnim_1, FlagAnim_2, FlagAnim_3
+};
+
 enum class GameState { Menu, Playing, Defeat, Victory };
 enum class CellState { Open, Closed, Flagged };
 
@@ -53,6 +64,9 @@ public:
 
 class UI {
 private:
+	bool gameStarted = false;
+	bool gameEnded = false;
+	float finalTime = 0.0f;
 	Game& game;
 	float cellScalePx;
 	std::pair<float, float> gridStartPos;
