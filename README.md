@@ -1,4 +1,3 @@
-
 # Saper Game (SFML)
 
 ![C++](https://img.shields.io/badge/C++-17%2F20-blue.svg)
@@ -7,11 +6,12 @@
 
 ## Features
 
-- Smart mine placement
-- Smooth animations
-- Selfdrawn textures
+- Smart mine placement (First-click safety)
+- Smooth animations & Self-drawn textures
 - Chording mechanic
-- PC adaptive layout
+- PC adaptive layout (Fullscreen support)
+- **Highly optimized rendering (Dual-layer Vertex Arrays)**
+- **Strictly decoupled UI and Game logic (MVC-like architecture)**
 
 ## Tech Stack
 
@@ -35,11 +35,12 @@ The project is divided into two main versions sharing the same core logic:
 
 - Core Logic: Handled by board.hpp/cpp (shared between both versions).
 
-```Plaintext
+```txt
 ├── ConsoleVersion/          # CLI implementation
 │   ├── board.cpp/hpp        # Shared core game logic
 │   └── console.cpp          # Console-specific entry point
 ├── SFMLVersion/             # Graphical implementation
+│   ├── sfml.hpp             # Architecture headers (UI, Game, State Machine)
 │   ├── SFML.cpp             # GUI-specific entry point & rendering
 │   ├── tiles.png            # Custom hand-drawn textures
 │   └── font.ttf             # Game font
@@ -85,7 +86,7 @@ g++ ConsoleVersion/console.cpp ConsoleVersion/board.cpp -o SaperConsole
 **SFML Build:**
 
 ```Bash
-g++ SFMLVersion/SFML.cpp ConsoleVersion/board.cpp -IConsoleVersion -o SaperGUI
+g++ SFMLVersion/SFML.cpp ConsoleVersion/board.cpp -IConsoleVersion -o SaperGUI -lsfml-graphics -lsfml-window -lsfml-system
 ```
 
 > **Note:** Ensure SFML 3.x headers and libraries are in your compiler's search path.
