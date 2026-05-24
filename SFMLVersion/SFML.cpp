@@ -1,12 +1,12 @@
 #include "../ConsoleVersion/board.hpp"
-#include <SFML/Graphics.hpp>
-#include <iostream>
-#include <optional>
-#include <vector>
-#include <sstream>
+#include "sfml.hpp"
 #include <algorithm>
 #include <iomanip>
-#include "sfml.hpp"
+#include <iostream>
+#include <optional>
+#include <SFML/Graphics.hpp>
+#include <sstream>
+#include <vector>
 
 const int tileSize = 32;
 const int baseTopBarHeight = 60;
@@ -18,6 +18,7 @@ sf::FloatRect getTextureRect(SpriteType type, bool isDark) {
 	int x = 0;
 	int y = 0;
 	switch (type) {
+	case None: x = 1; y = 4; break;
 	case Closed: x = 0; y = 0; break;
 	case Flagged: x = 5; y = 0; break;
 	case WrongFlagged: x = 6; y = 0; break;
@@ -44,7 +45,7 @@ sf::FloatRect getTextureRect(SpriteType type, bool isDark) {
 	if (isDark && (type == Mine || type == Empty || (type >= One && type <= Eight))) {
 		x += 3;
 	}
-	return sf::FloatRect({ x * tileSize, y * tileSize }, { tileSize, tileSize });
+	return sf::FloatRect({ static_cast<float>(x * tileSize), static_cast<float>(y * tileSize) }, { static_cast<float>(tileSize), static_cast<float>(tileSize) });
 }
 
 SpriteType getOpenFrame(float progress) {
@@ -85,11 +86,11 @@ void ClickHandler::operator()(MouseButton& button) {
 	game.updateBoard();
 }
 
-UI::UI(Game& game):
+UI::UI(Game& game) :
 	game(game),
-	window(sf::VideoMode({ 800, 600 }), "Saper", sf::Style::Default),
+	window(sf::VideoMode::getDesktopMode(), "Saper game", sf::Style::Default),
 	textTimer(font),
-	textMines(font) 
+	textMines(font)
 {
 	window.setFramerateLimit(60);
 	loadResources();
@@ -98,63 +99,152 @@ UI::UI(Game& game):
 
 void UI::initLayout() {
 	Board& board = game.getBoard();
+
 	int rows = board.getRows();
 	int cols = board.getCols();
-	cellsVA.setPrimitiveType(sf::PrimitiveType::Triangles);
-	cellsVA.resize(rows * cols * 6);
+
+	sf::Vector2u winSize = window.getSize();
+
+	float screenWidth = static_cast<float>(winSize.x);
+	float screenHeight = static_cast<float>(winSize.y);
+
+	float contentWidth = cols * tileSize;
+	float contentHeight = (rows * tileSize) + baseTopBarHeight;
+
+	float availableWidth = screenWidth - (minMargin * 2);
+	float availableHeight = screenHeight - (minMargin * 2);
+
+	float scaleX = availableWidth / contentWidth;
+	float scaleY = availableHeight / contentHeight;
+
+	cellScalePx = std::min(scaleX, scaleY);
+	boardWidth = contentWidth * cellScalePx;
+
+	topBarHeight = baseTopBarHeight * cellScalePx;
+	float finalTotalHeight = topBarHeight + ((rows * tileSize) * cellScalePx);
+
+	float offsetX = (screenWidth - boardWidth) / 2.0f;
+	float startY = (screenHeight - finalTotalHeight) / 2.0f;
+
+	gridStartPos.first = offsetX;
+	gridStartPos.second = startY + topBarHeight;
+
+	topBarRect.setSize({ screenWidth, topBarHeight });
+	topBarRect.setPosition({ 0.0f, 0.0f });
+	topBarRect.setFillColor(sf::Color({ 46, 46, 54 }));
+
+	unsigned int fontSize = static_cast<unsigned int>(14 * cellScalePx);
+
+	textTimer.setCharacterSize(fontSize);
+	textMines.setCharacterSize(fontSize);
+
+	backgroundVA.setPrimitiveType(sf::PrimitiveType::Triangles);
+	overlayVA.setPrimitiveType(sf::PrimitiveType::Triangles);
+
+	backgroundVA.resize(rows * cols * 6);
+	overlayVA.resize(rows * cols * 6);
+
 	for (int r = 0; r < rows; ++r) {
 		for (int c = 0; c < cols; ++c) {
-			sf::Vertex* cellVertex = &cellsVA[(r * cols + c) * 6];
-			float left = c * tileSize;
-			float right = (c + 1) * tileSize;
-			float top = r * tileSize;
-			float bottom = (r + 1) * tileSize;
-			cellVertex[0].position = { left, top };
-			cellVertex[1].position = { right, top };
-			cellVertex[2].position = { left, bottom };
-			cellVertex[3].position = { right, top };
-			cellVertex[4].position = { right, bottom };
-			cellVertex[5].position = { left, bottom };
+			sf::Vertex* backgroundVertex = &backgroundVA[(r * cols + c) * 6];
+			sf::Vertex* overlayVertex = &overlayVA[(r * cols + c) * 6];
+
+			float left = gridStartPos.first + (c * tileSize * cellScalePx);
+			float right = gridStartPos.first + ((c + 1) * tileSize * cellScalePx);
+			float top = gridStartPos.second + (r * tileSize * cellScalePx);
+			float bottom = gridStartPos.second + ((r + 1) * tileSize * cellScalePx);
+
+			backgroundVertex[0].position = { left, top };
+			backgroundVertex[1].position = { right, top };
+			backgroundVertex[2].position = { left, bottom };
+			backgroundVertex[3].position = { right, top };
+			backgroundVertex[4].position = { right, bottom };
+			backgroundVertex[5].position = { left, bottom };
+
+			overlayVertex[0].position = { left, top };
+			overlayVertex[1].position = { right, top };
+			overlayVertex[2].position = { left, bottom };
+			overlayVertex[3].position = { right, top };
+			overlayVertex[4].position = { right, bottom };
+			overlayVertex[5].position = { left, bottom };
 
 			bool isDark = (r + c) & 1;
+
 			sf::FloatRect textureRect = getTextureRect(SpriteType::Closed, isDark);
+
 			float txRectLeft = textureRect.position.x;
 			float txRectRight = txRectLeft + textureRect.size.x;
 			float txRectTop = textureRect.position.y;
 			float txRectBottom = txRectTop + textureRect.size.y;
-			cellVertex[0].texCoords = { txRectLeft, txRectTop };
-			cellVertex[1].texCoords = { txRectRight, txRectTop };
-			cellVertex[2].texCoords = { txRectLeft, txRectBottom };
-			cellVertex[3].texCoords = { txRectRight, txRectTop };
-			cellVertex[4].texCoords = { txRectRight, txRectBottom };
-			cellVertex[5].texCoords = { txRectLeft, txRectBottom };
+
+			backgroundVertex[0].texCoords = { txRectLeft, txRectTop };
+			backgroundVertex[1].texCoords = { txRectRight, txRectTop };
+			backgroundVertex[2].texCoords = { txRectLeft, txRectBottom };
+			backgroundVertex[3].texCoords = { txRectRight, txRectTop };
+			backgroundVertex[4].texCoords = { txRectRight, txRectBottom };
+			backgroundVertex[5].texCoords = { txRectLeft, txRectBottom };
+
+			overlayVertex[0].texCoords = { txRectLeft, txRectTop };
+			overlayVertex[1].texCoords = { txRectRight, txRectTop };
+			overlayVertex[2].texCoords = { txRectLeft, txRectBottom };
+			overlayVertex[3].texCoords = { txRectRight, txRectTop };
+			overlayVertex[4].texCoords = { txRectRight, txRectBottom };
+			overlayVertex[5].texCoords = { txRectLeft, txRectBottom };
 		}
 	}
 }
 
 void UI::updateCell(int row, int col, const Cell& cell, const CellAnim& anim, std::pair<int, int> explodedMine) {
-	int cols = game.getCols();
+	int cols = game.getBoard().getCols();
+
 	int idx = (row * cols + col) * 6;
+
 	bool isDark = (row + col) & 1;
-	sf::FloatRect textureRect = getTextureRect(getCellType(row, col, anim, explodedMine), isDark);
-	float txRectLeft = textureRect.position.x;
-	float txRectRight = txRectLeft + textureRect.size.x;
-	float txRectTop = textureRect.position.y;
-	float txRectBottom = txRectTop + textureRect.size.y;
-	cellsVA[idx + 0].texCoords = { txRectLeft, txRectTop };
-	cellsVA[idx + 1].texCoords = { txRectRight, txRectTop };
-	cellsVA[idx + 2].texCoords = { txRectLeft, txRectBottom };
-	cellsVA[idx + 3].texCoords = { txRectRight, txRectTop };
-	cellsVA[idx + 4].texCoords = { txRectRight, txRectBottom };
-	cellsVA[idx + 5].texCoords = { txRectLeft, txRectBottom };
+
+	sf::FloatRect backgroundRect = getTextureRect(getBackgroundType(row, col, explodedMine), isDark);
+	sf::FloatRect overlayRect = getTextureRect(getOverlayType(row, col, anim), isDark);
+
+	float bgRectLeft = backgroundRect.position.x;
+	float bgRectRight = bgRectLeft + backgroundRect.size.x;
+	float bgRectTop = backgroundRect.position.y;
+	float bgRectBottom = bgRectTop + backgroundRect.size.y;
+
+	float ovRectLeft = overlayRect.position.x;
+	float ovRectRight = ovRectLeft + overlayRect.size.x;
+	float ovRectTop = overlayRect.position.y;
+	float ovRectBottom = ovRectTop + overlayRect.size.y;
+
+	backgroundVA[idx + 0].texCoords = { bgRectLeft, bgRectTop };
+	backgroundVA[idx + 1].texCoords = { bgRectRight,bgRectTop };
+	backgroundVA[idx + 2].texCoords = { bgRectLeft, bgRectBottom };
+	backgroundVA[idx + 3].texCoords = { bgRectRight,bgRectTop };
+	backgroundVA[idx + 4].texCoords = { bgRectRight,bgRectBottom };
+	backgroundVA[idx + 5].texCoords = { bgRectLeft, bgRectBottom };
+
+	overlayVA[idx + 0].texCoords = { ovRectLeft, ovRectTop };
+	overlayVA[idx + 1].texCoords = { ovRectRight,ovRectTop };
+	overlayVA[idx + 2].texCoords = { ovRectLeft, ovRectBottom };
+	overlayVA[idx + 3].texCoords = { ovRectRight,ovRectTop };
+	overlayVA[idx + 4].texCoords = { ovRectRight,ovRectBottom };
+	overlayVA[idx + 5].texCoords = { ovRectLeft, ovRectBottom };
 }
 
-SpriteType UI::getCellType(int row, int col, const CellAnim& anim, std::pair<int, int> explodedMine) {
+SpriteType UI::getBackgroundType(int row, int col, std::pair<int, int> explodedMine) {
+	Cell& cell = game.getBoard().getCell(row, col);
+	if (cell.isMine) {
+		return (explodedMine == std::make_pair(row, col)) ? Exploded : Mine;
+	}
+	else {
+		return static_cast<SpriteType>(Empty + cell.neighborMines);
+	}
+}
+
+SpriteType UI::getOverlayType(int row, int col, const CellAnim& anim) {
 	Cell& cell = game.getBoard().getCell(row, col);
 	if (!cell.isRevealed) {
 		if (anim.flagProgress > 0.0f && anim.flagProgress < 1.0f) {
 			float progress = anim.flagProgress;
-			if (anim.flagProgress && progress > 0.0f) progress = 1.0f - progress;
+			if (anim.removeFlag && progress > 0.0f) progress = 1.0f - progress;
 			return getFlagFrame(progress);
 		}
 		if (cell.isFlagged) {
@@ -166,12 +256,7 @@ SpriteType UI::getCellType(int row, int col, const CellAnim& anim, std::pair<int
 		if (anim.openProgress > 0.0f && anim.openProgress < 1.0f) {
 			return getOpenFrame(anim.openProgress);
 		}
-		if (cell.isMine) {
-			return (explodedMine == std::make_pair(row, col)) ? Exploded : Mine;
-		}
-		else {
-			return static_cast<SpriteType>(Empty + cell.neighborMines);
-		}
+		return None;
 	}
 }
 
@@ -191,11 +276,17 @@ bool UI::loadResources() {
 
 void UI::handleInput(float mouseX, float mouseY, sf::Mouse::Button button) {
 	Board& board = game.getBoard();
-	float localX = mouseX - gridStartPos.first;
-	float localY = mouseY - gridStartPos.second;
-	int pressedCol = static_cast<int>(localX / cellScalePx);
-	int pressedRow = static_cast<int>(localY / cellScalePx);
-	if (board.isValidMove(pressedRow, pressedCol)) {
+	sf::Vector2i pixelPos(static_cast<int>(mouseX), static_cast<int>(mouseY));
+	sf::Vector2f worldPos = window.mapPixelToCoords(pixelPos);
+	float localX = worldPos.x - gridStartPos.first;
+	float localY = worldPos.y - gridStartPos.second;
+	int pressedCol = static_cast<int>(localX / (tileSize * cellScalePx));
+	int pressedRow = static_cast<int>(localY / (tileSize * cellScalePx));
+	if (localX >= 0 && localY >= 0 && board.isValidMove(pressedRow, pressedCol)) {
+		if (game.getGameState() == GameState::Menu) {
+			game.startPlaying();
+			gameTimer.restart();
+		}
 		ClickHandler click(this->game, pressedRow, pressedCol);
 		MouseButton btn = (button == sf::Mouse::Button::Left) ? MouseButton::LCM : MouseButton::RCM;
 		click(btn);
@@ -225,6 +316,21 @@ void UI::update() {
 			int idx = i * cols + j;
 			const Cell& cell = board.getCell(i, j);
 			CellAnim& anim = animState[idx];
+			CellState& prev = cellState[idx];
+			if (cell.isRevealed && prev != CellState::Open) {
+				anim.openProgress = 0.01f;
+				prev = CellState::Open;
+			}
+			if (!cell.isRevealed && cell.isFlagged && prev != CellState::Flagged) {
+				anim.flagProgress = 0.01f;
+				anim.removeFlag = false;
+				prev = CellState::Flagged;
+			}
+			if (!cell.isRevealed && !cell.isFlagged && prev == CellState::Flagged) {
+				anim.flagProgress = 0.01f;
+				anim.removeFlag = true;
+				prev = CellState::Closed;
+			}
 			Lerp(anim.openProgress, dt, openSpeed);
 			Lerp(anim.flagProgress, dt, flagSpeed);
 			updateCell(i, j, cell, anim, board.getExplodedMine());
@@ -238,12 +344,16 @@ void UI::update() {
 	}
 	int totalMines = rows * cols * 0.156f;
 	textMines.setString("Mines left: " + std::to_string(totalMines - flagsPlaced));
-	bool isGameWon = board.isGameWon();
-	bool isGameOver = board.isGameOver();
-	float currentTime = gameTimer.getElapsedTime().asSeconds();
-	if (isGameOver || isGameWon) {
-		currentTime = 0.0f;
+
+	GameState gstate = game.getGameState();
+	if ((gstate == GameState::Defeat || gstate == GameState::Victory) && finalTime == 0.0f) {
+		finalTime = gameTimer.getElapsedTime().asSeconds();
 	}
+	float currentTime = 0.0f;
+	if (gstate == GameState::Playing)
+		currentTime = gameTimer.getElapsedTime().asSeconds();
+	else if (gstate == GameState::Defeat || gstate == GameState::Victory)
+		currentTime = finalTime;
 
 	std::stringstream ss;
 	ss << std::fixed << std::setprecision(1) << currentTime;
@@ -258,7 +368,8 @@ void UI::render() {
 	window.draw(topBarRect);
 	window.draw(textMines);
 	window.draw(textTimer);
-	window.draw(cellsVA, &tilesTexture);
+	window.draw(backgroundVA, &tilesTexture);
+	window.draw(overlayVA, &tilesTexture);
 	window.display();
 }
 
@@ -278,22 +389,27 @@ Game::Game(int rows, int cols)
 	this->state = GameState::Menu;
 }
 
+void Game::updateBoard() {
+	if (board.isGameOver()) {
+		state = GameState::Defeat;
+		board.revealAll();
+	}
+	else if (board.isGameWon()) {
+		state = GameState::Victory;
+		board.revealAll();
+	}
+}
+
+void Game::startPlaying() {
+	if (state == GameState::Menu) state = GameState::Playing;
+}
+
 int main() {
 	int rows = 10;
 	int cols = 10;
 	float minesPercent = 0.21f;
 	if (rows < 5) rows = 5;
 	if (cols < 5) cols = 5;
-
-	sf::RenderWindow window(sf::VideoMode::getDesktopMode(), "Saper", sf::Style::Default);
-	
-	sf::Texture tempTexture;
-	sf::Sprite sprite(tempTexture);
-	
-	sf::Font tempFont;
-	sf::Text textTimer(tempFont);
-	sf::Text textMines(tempFont);
-
 	Game game(rows, cols);
 	UI ui(game);
 	ui.run();

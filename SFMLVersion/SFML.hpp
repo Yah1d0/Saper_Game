@@ -1,7 +1,7 @@
 #pragma once
 #include "../ConsoleVersion/board.hpp"
-#include <variant>
 #include <SFML/Graphics.hpp>
+#include <variant>
 
 class Game;
 
@@ -22,6 +22,7 @@ struct ClickHandler {
 };
 
 enum SpriteType {
+	None,
 	Closed,
 	Flagged,
 	WrongFlagged,
@@ -33,7 +34,7 @@ enum SpriteType {
 };
 
 enum class GameState { Menu, Playing, Defeat, Victory };
-enum class CellState { Open, Closed, Flagged };
+enum class CellState { Closed, Open, Flagged };
 
 
 class Game {
@@ -42,15 +43,13 @@ private:
 	int totalMines;
 	Board board;
 	GameState state;
-	int rows, cols;
 	float finishTimeMs = 0.0;
 	std::unique_ptr<CellAnim[]> AnimStateArr;
 	std::unique_ptr<CellState[]> CellStateArr;
 public:
 	Game(int rows, int cols);
-	void getGameResult();
 	void updateBoard();
-	void handleInput();
+	void startPlaying();
 	Board& getBoard() { return board; }
 	const Board& getBoard() const { return board; }
 	CellAnim* getAnimState() { return AnimStateArr.get(); }
@@ -58,21 +57,18 @@ public:
 	CellState* getCellState() { return CellStateArr.get(); }
 	const CellState* getCellState() const { return CellStateArr.get(); }
 	GameState getGameState() const { return state; }
-	int getRows() const { return rows; }
-	int getCols() const { return cols; }
 };
 
 class UI {
 private:
-	bool gameStarted = false;
-	bool gameEnded = false;
 	float finalTime = 0.0f;
 	Game& game;
 	float cellScalePx;
 	std::pair<float, float> gridStartPos;
 	float boardWidth;
 	float topBarHeight;
-	sf::VertexArray cellsVA;
+	sf::VertexArray backgroundVA;
+	sf::VertexArray	overlayVA;
 	sf::RenderWindow window;
 	sf::Clock dtClock;
 	sf::Clock gameTimer;
@@ -85,7 +81,8 @@ public:
 	UI(Game& game);
 	void initLayout();
 	void updateCell(int row, int col, const Cell& cell, const CellAnim& anim, std::pair<int, int> explodedMine);
-	SpriteType getCellType(int row, int col, const CellAnim& anim, std::pair<int, int> explodedMine);
+	SpriteType getBackgroundType(int row, int col, std::pair<int, int> explodedMine);
+	SpriteType getOverlayType(int row, int col, const CellAnim& anim);
 	bool loadResources();
 	void handleInput(float mouseX, float mouseY, sf::Mouse::Button button);
 	void processEvents();
