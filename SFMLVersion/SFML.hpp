@@ -13,11 +13,11 @@ struct CellAnim {
 	bool removeFlag = false;
 };
 
-struct ClickHandler {
+struct ClickHandler final {
 	Game& game;
 	int row;
 	int col;
-	ClickHandler(Game& g, int r, int c);
+	explicit ClickHandler(Game& g, int r, int c);
 	void operator()(MouseButton& button);
 };
 
@@ -37,36 +37,31 @@ enum class GameState { Menu, Playing, Defeat, Victory };
 enum class CellState { Closed, Open, Flagged };
 
 
-class Game {
+class Game final {
 private:
-	float minesFreq = 0.156f;
 	int totalMines;
 	Board board;
 	GameState state;
-	float finishTimeMs = 0.0;
-	std::unique_ptr<CellAnim[]> AnimStateArr;
-	std::unique_ptr<CellState[]> CellStateArr;
 public:
-	Game(int rows, int cols);
+	explicit Game(int rows, int cols);
 	void updateBoard();
 	void startPlaying();
+	void restart(int rows, int cols);
 	Board& getBoard() { return board; }
 	const Board& getBoard() const { return board; }
-	CellAnim* getAnimState() { return AnimStateArr.get(); }
-	const CellAnim* getAnimState() const { return AnimStateArr.get(); }
-	CellState* getCellState() { return CellStateArr.get(); }
-	const CellState* getCellState() const { return CellStateArr.get(); }
 	GameState getGameState() const { return state; }
 };
 
-class UI {
+class UI final {
 private:
-	float finalTime = 0.0f;
 	Game& game;
 	float cellScalePx;
 	std::pair<float, float> gridStartPos;
 	float boardWidth;
 	float topBarHeight;
+	float finalTime = 0.0f;
+	std::unique_ptr<CellAnim[]> AnimStateArr;
+	std::unique_ptr<CellState[]> CellStateArr;
 	sf::VertexArray backgroundVA;
 	sf::VertexArray	overlayVA;
 	sf::RenderWindow window;
@@ -78,7 +73,7 @@ private:
 	sf::Text textMines;
 	sf::RectangleShape topBarRect;
 public:
-	UI(Game& game);
+	explicit UI(Game& game);
 	void initLayout();
 	void updateCell(int row, int col, const Cell& cell, const CellAnim& anim, std::pair<int, int> explodedMine);
 	SpriteType getBackgroundType(int row, int col, std::pair<int, int> explodedMine);
@@ -89,4 +84,8 @@ public:
 	void update();
 	void render();
 	void run();
+	CellAnim* getAnimState() { return AnimStateArr.get(); }
+	const CellAnim* getAnimState() const { return AnimStateArr.get(); }
+	CellState* getCellState() { return CellStateArr.get(); }
+	const CellState* getCellState() const { return CellStateArr.get(); }
 };

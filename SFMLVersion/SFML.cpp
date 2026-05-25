@@ -8,39 +8,40 @@
 #include <sstream>
 #include <vector>
 
-const int tileSize = 32;
-const int baseTopBarHeight = 60;
-const int minMargin = 100;
-const float openSpeed = 4.0f;
-const float flagSpeed = 5.0f;
+constexpr int tileSize = 32;
+constexpr int baseTopBarHeight = 60;
+constexpr int minMargin = 100;
+constexpr float openSpeed = 4.0f;
+constexpr float flagSpeed = 5.0f;
+constexpr float default_mine_density = 0.156f;
 
 sf::FloatRect getTextureRect(SpriteType type, bool isDark) {
 	int x = 0;
 	int y = 0;
 	switch (type) {
-	case None: x = 1; y = 4; break;
-	case Closed: x = 0; y = 0; break;
-	case Flagged: x = 5; y = 0; break;
-	case WrongFlagged: x = 6; y = 0; break;
-	case Mine: x = 1; y = 2; break;
-	case Exploded: x = 1; y = 3; break;
-	case Empty: x = 1; y = 1; break;
-	case One: x = 2; y = 1; break;
-	case Two: x = 2; y = 2; break;
-	case Three: x = 2; y = 3; break;
-	case Four: x = 2; y = 4; break;
-	case Five: x = 3; y = 1; break;
-	case Six: x = 3; y = 2; break;
-	case Seven: x = 3; y = 3; break;
-	case Eight: x = 3; y = 4; break;
-	case OpenAnim_0: x = 0; y = 1; break;
-	case OpenAnim_1: x = 0; y = 2; break;
-	case OpenAnim_2: x = 0; y = 3; break;
-	case OpenAnim_3: x = 0; y = 4; break;
-	case FlagAnim_0: x = 1; y = 0; break;
-	case FlagAnim_1: x = 2; y = 0; break;
-	case FlagAnim_2: x = 3; y = 0; break;
-	case FlagAnim_3: x = 4; y = 0; break;
+		case None: x = 1; y = 4; break;
+		case Closed: x = 0; y = 0; break;
+		case Flagged: x = 5; y = 0; break;
+		case WrongFlagged: x = 6; y = 0; break;
+		case Mine: x = 1; y = 2; break;
+		case Exploded: x = 1; y = 3; break;
+		case Empty: x = 1; y = 1; break;
+		case One: x = 2; y = 1; break;
+		case Two: x = 2; y = 2; break;
+		case Three: x = 2; y = 3; break;
+		case Four: x = 2; y = 4; break;
+		case Five: x = 3; y = 1; break;
+		case Six: x = 3; y = 2; break;
+		case Seven: x = 3; y = 3; break;
+		case Eight: x = 3; y = 4; break;
+		case OpenAnim_0: x = 0; y = 1; break;
+		case OpenAnim_1: x = 0; y = 2; break;
+		case OpenAnim_2: x = 0; y = 3; break;
+		case OpenAnim_3: x = 0; y = 4; break;
+		case FlagAnim_0: x = 1; y = 0; break;
+		case FlagAnim_1: x = 2; y = 0; break;
+		case FlagAnim_2: x = 3; y = 0; break;
+		case FlagAnim_3: x = 4; y = 0; break;
 	}
 	if (isDark && (type == Mine || type == Empty || (type >= One && type <= Eight))) {
 		x += 3;
@@ -79,8 +80,7 @@ void ClickHandler::operator()(MouseButton& button) {
 		if (!hitMine) {
 			board.Chord(row, col);
 		}
-	}
-	else if (button == MouseButton::RCM) {
+	} else if (button == MouseButton::RCM) {
 		board.Flag(row, col);
 	}
 	game.updateBoard();
@@ -90,7 +90,9 @@ UI::UI(Game& game) :
 	game(game),
 	window(sf::VideoMode::getDesktopMode(), "Saper game", sf::Style::Default),
 	textTimer(font),
-	textMines(font)
+	textMines(font),
+	AnimStateArr(std::make_unique<CellAnim[]>(game.getBoard().getRows()* game.getBoard().getCols())),
+	CellStateArr(std::make_unique<CellState[]>(game.getBoard().getRows()* game.getBoard().getCols()))
 {
 	window.setFramerateLimit(60);
 	loadResources();
@@ -102,6 +104,9 @@ void UI::initLayout() {
 
 	int rows = board.getRows();
 	int cols = board.getCols();
+
+	std::fill(AnimStateArr.get(), AnimStateArr.get() + rows * cols, CellAnim{});
+	std::fill(CellStateArr.get(), CellStateArr.get() + rows * cols, CellState::Closed);
 
 	sf::Vector2u winSize = window.getSize();
 
@@ -233,8 +238,7 @@ SpriteType UI::getBackgroundType(int row, int col, std::pair<int, int> explodedM
 	Cell& cell = game.getBoard().getCell(row, col);
 	if (cell.isMine) {
 		return (explodedMine == std::make_pair(row, col)) ? Exploded : Mine;
-	}
-	else {
+	} else {
 		return static_cast<SpriteType>(Empty + cell.neighborMines);
 	}
 }
@@ -251,8 +255,7 @@ SpriteType UI::getOverlayType(int row, int col, const CellAnim& anim) {
 			return Flagged;
 		}
 		return Closed;
-	}
-	else {
+	} else {
 		if (anim.openProgress > 0.0f && anim.openProgress < 1.0f) {
 			return getOpenFrame(anim.openProgress);
 		}
@@ -276,18 +279,20 @@ bool UI::loadResources() {
 
 void UI::handleInput(float mouseX, float mouseY, sf::Mouse::Button button) {
 	Board& board = game.getBoard();
+	GameState gstate = game.getGameState();
 	sf::Vector2i pixelPos(static_cast<int>(mouseX), static_cast<int>(mouseY));
 	sf::Vector2f worldPos = window.mapPixelToCoords(pixelPos);
 	float localX = worldPos.x - gridStartPos.first;
 	float localY = worldPos.y - gridStartPos.second;
 	int pressedCol = static_cast<int>(localX / (tileSize * cellScalePx));
 	int pressedRow = static_cast<int>(localY / (tileSize * cellScalePx));
+	if (gstate == GameState::Defeat || gstate == GameState::Victory) return;
 	if (localX >= 0 && localY >= 0 && board.isValidMove(pressedRow, pressedCol)) {
 		if (game.getGameState() == GameState::Menu) {
 			game.startPlaying();
 			gameTimer.restart();
 		}
-		ClickHandler click(this->game, pressedRow, pressedCol);
+		ClickHandler click(game, pressedRow, pressedCol);
 		MouseButton btn = (button == sf::Mouse::Button::Left) ? MouseButton::LCM : MouseButton::RCM;
 		click(btn);
 	}
@@ -297,9 +302,17 @@ void UI::processEvents() {
 	while (const std::optional event = window.pollEvent()) {
 		if (event->is<sf::Event::Closed>()) {
 			window.close();
-		}
-		else if (const auto* mouseEvent = event->getIf<sf::Event::MouseButtonPressed>()) {
+		} else if (const auto* mouseEvent = event->getIf<sf::Event::MouseButtonPressed>()) {
 			handleInput(static_cast<float>(mouseEvent->position.x), static_cast<float>(mouseEvent->position.y), mouseEvent->button);
+		} else if (const auto* keyEvent = event->getIf<sf::Event::KeyPressed>()) {
+			if (keyEvent->code == sf::Keyboard::Key::R) {
+				int rows = game.getBoard().getRows();
+				int cols = game.getBoard().getCols();
+				game.restart(rows, cols);
+				finalTime = 0.0f;
+				gameTimer.restart();
+				initLayout();
+			}
 		}
 	}
 }
@@ -309,8 +322,8 @@ void UI::update() {
 	Board& board = game.getBoard();
 	int rows = board.getRows();
 	int cols = board.getCols();
-	CellAnim* animState = game.getAnimState();
-	CellState* cellState = game.getCellState();
+	CellAnim* animState = getAnimState();
+	CellState* cellState = getCellState();
 	for (int i = 0; i < rows; i++) {
 		for (int j = 0; j < cols; j++) {
 			int idx = i * cols + j;
@@ -342,7 +355,7 @@ void UI::update() {
 			if (board.getCell(i, j).isFlagged) flagsPlaced++;
 		}
 	}
-	int totalMines = rows * cols * 0.156f;
+	int totalMines = rows * cols * default_mine_density;
 	textMines.setString("Mines left: " + std::to_string(totalMines - flagsPlaced));
 
 	GameState gstate = game.getGameState();
@@ -382,19 +395,16 @@ void UI::run() {
 }
 
 Game::Game(int rows, int cols)
-	: totalMines(static_cast<int>(rows* cols * 0.156)),
+	: totalMines(static_cast<int>(rows* cols * default_mine_density)),
 	board(rows, cols, totalMines) {
-	this->AnimStateArr = std::make_unique<CellAnim[]>(rows * cols);
-	this->CellStateArr = std::make_unique<CellState[]>(rows * cols);
-	this->state = GameState::Menu;
+	state = GameState::Menu;
 }
 
 void Game::updateBoard() {
 	if (board.isGameOver()) {
 		state = GameState::Defeat;
 		board.revealAll();
-	}
-	else if (board.isGameWon()) {
+	} else if (board.isGameWon()) {
 		state = GameState::Victory;
 		board.revealAll();
 	}
@@ -402,6 +412,11 @@ void Game::updateBoard() {
 
 void Game::startPlaying() {
 	if (state == GameState::Menu) state = GameState::Playing;
+}
+
+void Game::restart(int rows, int cols) {
+	board = Board(rows, cols, totalMines);
+	state = GameState::Menu;
 }
 
 int main() {
