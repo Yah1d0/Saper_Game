@@ -36,7 +36,7 @@ public:
 	Cell& getCell(int row, int col);
 	int  getRows() const;
 	int  getCols() const;
-	std::pair<int, int> getExplodedMine() const;
+	std::optional<std::pair<int, int>> getExplodedMine() const;
 	int  countNeighborFlags(int row, int col) const;
 	bool isValidMove(int row, int col) const;
 	bool openCell(int row, int col);

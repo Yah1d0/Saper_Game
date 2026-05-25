@@ -96,6 +96,8 @@ UI::UI(Game& game) :
 {
 	window.setFramerateLimit(60);
 	loadResources();
+	int rows = game.getBoard().getRows();
+	int cols = game.getBoard().getCols();
 	initLayout();
 }
 
@@ -199,7 +201,7 @@ void UI::initLayout() {
 	}
 }
 
-void UI::updateCell(int row, int col, const Cell& cell, const CellAnim& anim, std::pair<int, int> explodedMine) {
+void UI::updateCell(int row, int col, const Cell& cell, const CellAnim& anim, std::optional<std::pair<int, int>> explodedMine) {
 	int cols = game.getBoard().getCols();
 
 	int idx = (row * cols + col) * 6;
@@ -234,7 +236,7 @@ void UI::updateCell(int row, int col, const Cell& cell, const CellAnim& anim, st
 	overlayVA[idx + 5].texCoords = { ovRectLeft, ovRectBottom };
 }
 
-SpriteType UI::getBackgroundType(int row, int col, std::pair<int, int> explodedMine) {
+SpriteType UI::getBackgroundType(int row, int col, std::optional<std::pair<int, int>> explodedMine) {
 	Cell& cell = game.getBoard().getCell(row, col);
 	if (cell.isMine) {
 		return (explodedMine == std::make_pair(row, col)) ? Exploded : Mine;
@@ -302,7 +304,11 @@ void UI::processEvents() {
 	while (const std::optional event = window.pollEvent()) {
 		if (event->is<sf::Event::Closed>()) {
 			window.close();
-		} else if (const auto* mouseEvent = event->getIf<sf::Event::MouseButtonPressed>()) {
+		} else if (const auto* resizeEvent = event->getIf<sf::Event::Resized>()) {
+			sf::FloatRect visibleArea({ 0.f, 0.f }, { static_cast<float>(resizeEvent->size.x), static_cast<float>(resizeEvent->size.y) });
+			window.setView(sf::View(visibleArea));
+			initLayout();
+		}  else if (const auto* mouseEvent = event->getIf<sf::Event::MouseButtonPressed>()) {
 			handleInput(static_cast<float>(mouseEvent->position.x), static_cast<float>(mouseEvent->position.y), mouseEvent->button);
 		} else if (const auto* keyEvent = event->getIf<sf::Event::KeyPressed>()) {
 			if (keyEvent->code == sf::Keyboard::Key::R) {
@@ -311,6 +317,8 @@ void UI::processEvents() {
 				game.restart(rows, cols);
 				finalTime = 0.0f;
 				gameTimer.restart();
+				std::fill(AnimStateArr.get(), AnimStateArr.get() + rows * cols, CellAnim{});
+				std::fill(CellStateArr.get(), CellStateArr.get() + rows * cols, CellState::Closed);
 				initLayout();
 			}
 		}

@@ -5,25 +5,27 @@
 #include <string>
 #include <iomanip>
 #include <cctype>
+#include <string_view>
+#include <optional>
+#include <utility>
 
-// colors
-const std::string RESET = "\033[0m";
-const std::string GREY = "\033[90m";
-const std::string RED = "\033[91m";
-const std::string D_RED = "\033[31m";
-const std::string GREEN = "\033[92m";
-const std::string WHITE = "\033[97m";
-const std::string BLUE = "\033[94m";
-const std::string D_GREEN = "\033[32m";
-const std::string D_BLUE = "\033[34m";
-const std::string BROWN = "\033[33m";
-const std::string CYAN = "\033[36m";
-const std::string YELLOW = "\033[93m";
-const std::string PURPLE = "\033[35m";
-const std::string WHITE_ON_RED = "\033[97;41m";
+constexpr std::string_view RESET = "\033[0m";
+constexpr std::string_view GREY = "\033[90m";
+constexpr std::string_view RED = "\033[91m";
+constexpr std::string_view D_RED = "\033[31m";
+constexpr std::string_view GREEN = "\033[92m";
+constexpr std::string_view WHITE = "\033[97m";
+constexpr std::string_view BLUE = "\033[94m";
+constexpr std::string_view D_GREEN = "\033[32m";
+constexpr std::string_view D_BLUE = "\033[34m";
+constexpr std::string_view BROWN = "\033[33m";
+constexpr std::string_view CYAN = "\033[36m";
+constexpr std::string_view YELLOW = "\033[93m";
+constexpr std::string_view PURPLE = "\033[35m";
+constexpr std::string_view WHITE_ON_RED = "\033[97;41m";
 
 
-std::string getColorForNum(int n) {
+std::string_view getColorForNum(int n) {
 	switch (n) {
 		case 1: return BLUE;
 		case 2: return D_GREEN;
@@ -48,7 +50,7 @@ void clearConsole() {
 void renderBoard(const Board& board) {
 	int rows = board.getRows();
 	int cols = board.getCols();
-	std::pair<int, int> explodedMine = board.getExplodedMine();
+	std::optional<std::pair<int, int>> explodedMine = board.getExplodedMine();
 	std::cout << "   ";
 	for (int c = 0; c < cols; c++) {
 		std::cout << std::setw(2) << char('A' + c) << " ";
@@ -60,7 +62,7 @@ void renderBoard(const Board& board) {
 		for (int c = 0; c < cols; c++) {
 			const Cell& cell = board.getCell(r, c);
 			std::string context = " ";
-			std::string color = RESET;
+			std::string color = std::string(RESET);
 			if (cell.isFlagged) {
 				if (cell.isRevealed && !cell.isMine) {
 					context = "X";
@@ -74,7 +76,7 @@ void renderBoard(const Board& board) {
 				color = GREY;
 			} else if (cell.isMine) {
 				context = "*";
-				if (explodedMine.first == r && explodedMine.second == c) {
+				if (explodedMine == std::make_pair(r, c)) {
 					color = WHITE_ON_RED;
 				} else {
 					color = D_RED;

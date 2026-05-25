@@ -1,7 +1,7 @@
 #pragma once
 #include "../ConsoleVersion/board.hpp"
 #include <SFML/Graphics.hpp>
-#include <variant>
+#include <optional>
 
 class Game;
 
@@ -75,8 +75,8 @@ private:
 public:
 	explicit UI(Game& game);
 	void initLayout();
-	void updateCell(int row, int col, const Cell& cell, const CellAnim& anim, std::pair<int, int> explodedMine);
-	SpriteType getBackgroundType(int row, int col, std::pair<int, int> explodedMine);
+	void updateCell(int row, int col, const Cell& cell, const CellAnim& anim, std::optional<std::pair<int, int>> explodedMine);
+	SpriteType getBackgroundType(int row, int col, std::optional<std::pair<int, int>> explodedMine);
 	SpriteType getOverlayType(int row, int col, const CellAnim& anim);
 	bool loadResources();
 	void handleInput(float mouseX, float mouseY, sf::Mouse::Button button);

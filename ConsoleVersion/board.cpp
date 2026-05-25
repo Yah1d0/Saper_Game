@@ -6,6 +6,8 @@
 #include <string>
 #include <ctime>
 #include <iterator>
+#include <optional>
+#include <utility>
 
 namespace {
 	std::random_device rd;
@@ -28,7 +30,7 @@ int Board::getCols() const {
 	return cols;
 }
 
-std::pair<int, int> Board::getExplodedMine() const {
+std::optional<std::pair<int, int>> Board::getExplodedMine() const {
 	return explodedMine;
 }
 
