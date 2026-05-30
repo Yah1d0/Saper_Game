@@ -60,6 +60,7 @@ private:
 	float boardWidth;
 	float topBarHeight;
 	float finalTime = 0.0f;
+	GameState lastState;
 	std::unique_ptr<CellAnim[]> AnimStateArr;
 	std::unique_ptr<CellState[]> CellStateArr;
 	sf::VertexArray backgroundVA;
@@ -72,6 +73,18 @@ private:
 	sf::Text textTimer;
 	sf::Text textMines;
 	sf::RectangleShape topBarRect;
+	sf::RectangleShape overlayBackground;
+	sf::Text overlayMainText;
+	sf::RectangleShape restartButton;
+	sf::Text restartButtonText;
+	void calculateLayoutMetrics();
+	void setupVertexArrays();
+	void updateOverlayLayout();
+	void updateCellAnimations(float dt);
+	void updateGameStats();
+	float getGameTime() const;
+	void handleBoardClick(const sf::Vector2f& worldPos, sf::Mouse::Button button);
+	void handleOverlayClick(const sf::Vector2f& worldPos, sf::Mouse::Button button);
 public:
 	explicit UI(Game& game);
 	void initLayout();

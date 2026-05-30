@@ -91,8 +91,11 @@ UI::UI(Game& game) :
 	window(sf::VideoMode::getDesktopMode(), "Saper game", sf::Style::Default),
 	textTimer(font),
 	textMines(font),
+	lastState(GameState::Menu),
 	AnimStateArr(std::make_unique<CellAnim[]>(game.getBoard().getRows()* game.getBoard().getCols())),
-	CellStateArr(std::make_unique<CellState[]>(game.getBoard().getRows()* game.getBoard().getCols()))
+	CellStateArr(std::make_unique<CellState[]>(game.getBoard().getRows()* game.getBoard().getCols())),
+	overlayMainText(font),
+	restartButtonText(font)
 {
 	window.setFramerateLimit(60);
 	loadResources();
@@ -101,15 +104,10 @@ UI::UI(Game& game) :
 	initLayout();
 }
 
-void UI::initLayout() {
+void UI::calculateLayoutMetrics() {
 	Board& board = game.getBoard();
-
 	int rows = board.getRows();
 	int cols = board.getCols();
-
-	std::fill(AnimStateArr.get(), AnimStateArr.get() + rows * cols, CellAnim{});
-	std::fill(CellStateArr.get(), CellStateArr.get() + rows * cols, CellState::Closed);
-
 	sf::Vector2u winSize = window.getSize();
 
 	float screenWidth = static_cast<float>(winSize.x);
@@ -141,9 +139,14 @@ void UI::initLayout() {
 	topBarRect.setFillColor(sf::Color({ 46, 46, 54 }));
 
 	unsigned int fontSize = static_cast<unsigned int>(14 * cellScalePx);
-
 	textTimer.setCharacterSize(fontSize);
 	textMines.setCharacterSize(fontSize);
+}
+
+void UI::setupVertexArrays() {
+	Board& board = game.getBoard();
+	int rows = board.getRows();
+	int cols = board.getCols();
 
 	backgroundVA.setPrimitiveType(sf::PrimitiveType::Triangles);
 	overlayVA.setPrimitiveType(sf::PrimitiveType::Triangles);
@@ -176,7 +179,6 @@ void UI::initLayout() {
 			overlayVertex[5].position = { left, bottom };
 
 			bool isDark = (r + c) & 1;
-
 			sf::FloatRect textureRect = getTextureRect(SpriteType::Closed, isDark);
 
 			float txRectLeft = textureRect.position.x;
@@ -199,6 +201,128 @@ void UI::initLayout() {
 			overlayVertex[5].texCoords = { txRectLeft, txRectBottom };
 		}
 	}
+}
+
+void UI::updateOverlayLayout() {
+	GameState gstate = game.getGameState();
+	if (gstate != GameState::Defeat && gstate != GameState::Victory) return;
+
+	sf::Vector2u winSize = window.getSize();
+	float screenWidth = static_cast<float>(winSize.x);
+	float screenHeight = static_cast<float>(winSize.y);
+
+	overlayBackground.setSize({ screenWidth, screenHeight });
+	overlayBackground.setFillColor(sf::Color(15, 15, 25, 180));
+
+	if (gstate == GameState::Defeat) {
+		overlayMainText.setString("GAME OVER");
+		overlayMainText.setFillColor(sf::Color(230, 70, 70));
+	} else {
+		overlayMainText.setString("VICTORY!");
+		overlayMainText.setFillColor(sf::Color(70, 230, 70));
+	}
+
+	overlayMainText.setCharacterSize(static_cast<unsigned int>(42 * cellScalePx));
+	restartButtonText.setCharacterSize(static_cast<unsigned int>(16 * cellScalePx));
+	restartButton.setOutlineThickness(2.0f * cellScalePx);
+
+	sf::FloatRect textBounds = overlayMainText.getGlobalBounds();
+	float textX = (screenWidth - textBounds.size.x) / 2.0f;
+	float textY = (screenHeight - textBounds.size.y) / 2.0f - 60.0f * cellScalePx;
+	overlayMainText.setPosition({ textX, textY });
+
+	sf::Vector2f btnSize = { 200.0f * cellScalePx, 50.0f * cellScalePx };
+	restartButton.setSize(btnSize);
+	float btnX = (screenWidth - btnSize.x) / 2.0f;
+	float btnY = textY + textBounds.size.y + 50.0f * cellScalePx;
+	restartButton.setPosition({ btnX, btnY });
+
+	sf::FloatRect btnTextBounds = restartButtonText.getGlobalBounds();
+	float btnTextX = btnX + (btnSize.x - btnTextBounds.size.x) / 2.0f;
+	float btnTextY = btnY + (btnSize.y - btnTextBounds.size.y) / 2.0f - (3.0f * cellScalePx);
+	restartButtonText.setPosition({ btnTextX, btnTextY });
+}
+
+void UI::initLayout() {
+	calculateLayoutMetrics();
+	setupVertexArrays();
+	updateOverlayLayout();
+}
+
+void UI::updateCellAnimations(float dt) {
+	Board& board = game.getBoard();
+	int rows = board.getRows();
+	int cols = board.getCols();
+	CellAnim* animState = getAnimState();
+	CellState* cellState = getCellState();
+
+	for (int i = 0; i < rows; i++) {
+		for (int j = 0; j < cols; j++) {
+			int idx = i * cols + j;
+			const Cell& cell = board.getCell(i, j);
+			CellAnim& anim = animState[idx];
+			CellState& prev = cellState[idx];
+
+			if (cell.isRevealed && prev != CellState::Open) {
+				anim.openProgress = 0.01f;
+				prev = CellState::Open;
+			}
+			if (!cell.isRevealed && cell.isFlagged && prev != CellState::Flagged) {
+				anim.flagProgress = 0.01f;
+				anim.removeFlag = false;
+				prev = CellState::Flagged;
+			}
+			if (!cell.isRevealed && !cell.isFlagged && prev == CellState::Flagged) {
+				anim.flagProgress = 0.01f;
+				anim.removeFlag = true;
+				prev = CellState::Closed;
+			}
+
+			Lerp(anim.openProgress, dt, openSpeed);
+			Lerp(anim.flagProgress, dt, flagSpeed);
+			updateCell(i, j, cell, anim, board.getExplodedMine());
+		}
+	}
+}
+
+float UI::getGameTime() const {
+	GameState gstate = game.getGameState();
+	if (gstate == GameState::Playing)
+		return gameTimer.getElapsedTime().asSeconds();
+	else if (gstate == GameState::Defeat || gstate == GameState::Victory)
+		return finalTime;
+	return 0.0f;
+}
+
+void UI::updateGameStats() {
+	Board& board = game.getBoard();
+	int rows = board.getRows();
+	int cols = board.getCols();
+
+	int flagsPlaced = 0;
+	for (int i = 0; i < rows; i++) {
+		for (int j = 0; j < cols; j++) {
+			if (board.getCell(i, j).isFlagged) flagsPlaced++;
+		}
+	}
+
+	int totalMines = rows * cols * default_mine_density;
+	textMines.setString("Mines left: " + std::to_string(totalMines - flagsPlaced));
+
+	GameState gstate = game.getGameState();
+	if ((gstate == GameState::Defeat || gstate == GameState::Victory) && finalTime == 0.0f) {
+		finalTime = gameTimer.getElapsedTime().asSeconds();
+	}
+
+	float currentTime = getGameTime();
+
+	std::stringstream ss;
+	ss << std::fixed << std::setprecision(1) << currentTime;
+	textTimer.setString(ss.str());
+
+	float textY = (topBarHeight - textMines.getGlobalBounds().size.y) / 2.0f - (5 * cellScalePx);
+	textMines.setPosition({ gridStartPos.first, textY });
+	textTimer.setPosition({ gridStartPos.first + boardWidth - textTimer.getGlobalBounds().size.x, textY });
 }
 
 void UI::updateCell(int row, int col, const Cell& cell, const CellAnim& anim, std::optional<std::pair<int, int>> explodedMine) {
@@ -270,25 +394,53 @@ bool UI::loadResources() {
 		return false;
 	}
 	tilesTexture.setSmooth(false);
+
 	textTimer.setFont(font);
-	textMines.setFont(font);
 	textTimer.setFillColor(sf::Color::White);
 	textTimer.setStyle(sf::Text::Bold);
+
+	textMines.setFont(font);
 	textMines.setFillColor(sf::Color::White);
 	textMines.setStyle(sf::Text::Bold);
+
+	overlayMainText.setFont(font);
+	overlayMainText.setStyle(sf::Text::Bold);
+
+	restartButtonText.setFont(font);
+	restartButtonText.setStyle(sf::Text::Bold);
+	restartButtonText.setString("PLAY AGAIN");
+	restartButtonText.setFillColor(sf::Color::White);
+
+	restartButton.setFillColor(sf::Color(55, 55, 70));
+	restartButton.setOutlineColor(sf::Color::White);
 	return true;
 }
 
-void UI::handleInput(float mouseX, float mouseY, sf::Mouse::Button button) {
+void UI::handleOverlayClick(const sf::Vector2f& worldPos, sf::Mouse::Button button) {
+	if (button == sf::Mouse::Button::Left) {
+		if (restartButton.getGlobalBounds().contains(worldPos)) {
+			int rows = game.getBoard().getRows();
+			int cols = game.getBoard().getCols();
+			game.restart(rows, cols);
+			finalTime = 0.0f;
+			gameTimer.restart();
+
+			std::fill(AnimStateArr.get(), AnimStateArr.get() + rows * cols, CellAnim{});
+			std::fill(CellStateArr.get(), CellStateArr.get() + rows * cols, CellState::Closed);
+
+			initLayout();
+		}
+	}
+}
+
+void UI::handleBoardClick(const sf::Vector2f& worldPos, sf::Mouse::Button button) {
 	Board& board = game.getBoard();
-	GameState gstate = game.getGameState();
-	sf::Vector2i pixelPos(static_cast<int>(mouseX), static_cast<int>(mouseY));
-	sf::Vector2f worldPos = window.mapPixelToCoords(pixelPos);
 	float localX = worldPos.x - gridStartPos.first;
 	float localY = worldPos.y - gridStartPos.second;
+
 	int pressedCol = static_cast<int>(localX / (tileSize * cellScalePx));
 	int pressedRow = static_cast<int>(localY / (tileSize * cellScalePx));
-	if (gstate == GameState::Defeat || gstate == GameState::Victory) return;
+
 	if (localX >= 0 && localY >= 0 && board.isValidMove(pressedRow, pressedCol)) {
 		if (game.getGameState() == GameState::Menu) {
 			game.startPlaying();
@@ -297,6 +449,18 @@ void UI::handleInput(float mouseX, float mouseY, sf::Mouse::Button button) {
 		ClickHandler click(game, pressedRow, pressedCol);
 		MouseButton btn = (button == sf::Mouse::Button::Left) ? MouseButton::LCM : MouseButton::RCM;
 		click(btn);
+	}
+}
+
+void UI::handleInput(float mouseX, float mouseY, sf::Mouse::Button button) {
+	sf::Vector2i pixelPos(static_cast<int>(mouseX), static_cast<int>(mouseY));
+	sf::Vector2f worldPos = window.mapPixelToCoords(pixelPos);
+
+	GameState gstate = game.getGameState();
+	if (gstate == GameState::Defeat || gstate == GameState::Victory) {
+		handleOverlayClick(worldPos, button);
+	} else {
+		handleBoardClick(worldPos, button);
 	}
 }
 
@@ -327,61 +491,15 @@ void UI::processEvents() {
 
 void UI::update() {
 	float dt = dtClock.restart().asSeconds();
-	Board& board = game.getBoard();
-	int rows = board.getRows();
-	int cols = board.getCols();
-	CellAnim* animState = getAnimState();
-	CellState* cellState = getCellState();
-	for (int i = 0; i < rows; i++) {
-		for (int j = 0; j < cols; j++) {
-			int idx = i * cols + j;
-			const Cell& cell = board.getCell(i, j);
-			CellAnim& anim = animState[idx];
-			CellState& prev = cellState[idx];
-			if (cell.isRevealed && prev != CellState::Open) {
-				anim.openProgress = 0.01f;
-				prev = CellState::Open;
-			}
-			if (!cell.isRevealed && cell.isFlagged && prev != CellState::Flagged) {
-				anim.flagProgress = 0.01f;
-				anim.removeFlag = false;
-				prev = CellState::Flagged;
-			}
-			if (!cell.isRevealed && !cell.isFlagged && prev == CellState::Flagged) {
-				anim.flagProgress = 0.01f;
-				anim.removeFlag = true;
-				prev = CellState::Closed;
-			}
-			Lerp(anim.openProgress, dt, openSpeed);
-			Lerp(anim.flagProgress, dt, flagSpeed);
-			updateCell(i, j, cell, anim, board.getExplodedMine());
+	updateCellAnimations(dt);
+	updateGameStats();
+	GameState currentState = game.getGameState();
+	if (currentState != lastState) {
+		if (currentState == GameState::Defeat || currentState == GameState::Victory) {
+			updateOverlayLayout();
 		}
+		lastState = currentState;
 	}
-	int flagsPlaced = 0;
-	for (int i = 0; i < rows; i++) {
-		for (int j = 0; j < cols; j++) {
-			if (board.getCell(i, j).isFlagged) flagsPlaced++;
-		}
-	}
-	int totalMines = rows * cols * default_mine_density;
-	textMines.setString("Mines left: " + std::to_string(totalMines - flagsPlaced));
-
-	GameState gstate = game.getGameState();
-	if ((gstate == GameState::Defeat || gstate == GameState::Victory) && finalTime == 0.0f) {
-		finalTime = gameTimer.getElapsedTime().asSeconds();
-	}
-	float currentTime = 0.0f;
-	if (gstate == GameState::Playing)
-		currentTime = gameTimer.getElapsedTime().asSeconds();
-	else if (gstate == GameState::Defeat || gstate == GameState::Victory)
-		currentTime = finalTime;
-
-	std::stringstream ss;
-	ss << std::fixed << std::setprecision(1) << currentTime;
-	textTimer.setString(ss.str());
-	float textY = (topBarHeight - textMines.getGlobalBounds().size.y) / 2.0f - (5 * cellScalePx);
-	textMines.setPosition({ gridStartPos.first, textY });
-	textTimer.setPosition({ gridStartPos.first + boardWidth - textTimer.getGlobalBounds().size.x, textY });
 }
 
 void UI::render() {
@@ -391,6 +509,15 @@ void UI::render() {
 	window.draw(textTimer);
 	window.draw(backgroundVA, &tilesTexture);
 	window.draw(overlayVA, &tilesTexture);
+
+	GameState gstate = game.getGameState();
+	if (gstate == GameState::Defeat || gstate == GameState::Victory) {
+		window.draw(overlayBackground);
+		window.draw(overlayMainText);
+		window.draw(restartButton);
+		window.draw(restartButtonText);
+	}
+
 	window.display();
 }
 
